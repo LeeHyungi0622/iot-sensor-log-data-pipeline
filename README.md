@@ -1,4 +1,4 @@
-# Data Engineering Project Template
+# **IoT 센서 로그 데이터 수집 및 적재 파이프라인 구축**
 
 ## Overview
 
@@ -6,7 +6,7 @@ Here you want to write a short overview of the goals of your project and how it 
 
 ### Data Architecture
 
-![Example architecture image](example-architecture.png)
+![Example architecture image](assets/220621iot_project_aws_network_topology.png)
 
 If you decide to include this, you should also talk a bit about why you chose the architecture and tools you did for this project.
 
