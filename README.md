@@ -3,18 +3,32 @@
 ## **Overview**
 
 이번 프로젝트에서는 RaspberryPi를 활용하여 실시간으로 센서(SenseHAT)에서 받은 데이터를 처리하도록 Kappa Architecture로 데이터 파이프라인을 구성하였습니다. 
-받아온 데이터는 Kinesis data stream과 Kinesis data firehose를 통해 S3에 최종적으로 적재가 되고, 매번 센서 로그 파일이 쌓일때마다 Lambda에서 코드를 통해 DynamoDB에 파일 갯수를 카운트하게 되고, 20개의 파일이 적재되었을때 Amazon Athena를 통해 적재된 20개의 파일이 압축되어 별도의 S3 폴더에 저장되도록 구성하였습니다. 
+받아온 데이터는 Kinesis data stream과 Kinesis data firehose를 통해 S3에 최종적으로 적재가 됩니다. 
 
-S3에 적재된 데이터는 AWS의 QuickSight(BI 툴)서비스를 통해 시각화하여 처리할 수 있도록 구성하였고, 시간 단위로 Source 데이터를 업데이트가 되도록 구성하였습니다.
+센서 로그 파일의 경우, 파일이 쌓일때마다 Lambda에서 코드를 통해 DynamoDB에 파일 갯수를 카운트하게 되고, 20개의 파일이 적재되었을때 Amazon Athena를 통해 적재된 20개의 파일이 압축되어 별도의 S3 폴더에 저장되도록 구성하였습니다.
+
+이렇게 S3에 적재된 데이터는 AWS의 QuickSight(BI툴)서비스를 통해 시각화하여 처리할 수 있도록 구성하였고, 시간 단위로 Source 데이터를 업데이트가 되도록 구성하였습니다.
 
 ## **Data Architecture**
 
-![Example architecture image](assets/220621iot_project_aws_network_topology.png)
+![Example architecture image](assets/220707_iot_project_aws_network_topology.png)
 
-데이터 파이프라인에서 RaspberryPi의 센서 모듈(SenseHAT)로부터 생성된 데이터를 MQTT 메시지 프로토콜을 지원하는 mosquitto broker를 통해서 받아오고, Broker를 관리해주는 AWS 관리형 서비스인 IoT Core를 붙여서 구성하였습니다.
+### **(1) RaspberryPi(+SenseHAT) → AWS IoT Core**
+데이터 파이프라인에서 RaspberryPi의 센서 모듈(SenseHAT)로부터 생성된 데이터를 MQTT 메시지 프로토콜을 구현한 mosquitto broker를 통해서 받아오고, Broker를 관리해주는 AWS 관리형 서비스인 IoT Core를 붙여서 구성하였습니다.
 
-IoT Core를 별도로 붙여서 처리해준 이유는 
+IoT Core를 별도로 붙여서 처리해준 이유는 IoT Core를 사용하면, 대용량 데이터를 전송하기 적합한 MQTT 프로토콜을 사용하여 통신을 할 수 있으며, broker를 관리하기 용이하기 때문입니다. 
 
+HTTP로도 `동기식 통신`을 통하여 데이터를 받아서 처리할 수 있지만, client의 요청을 server에서 응답할 때 까지 기다리기 때문에 효율적이지 않은 방식이며, 그외에도 클라이언트에서 한 번 요청한 내용에 대해서 기억하지 않는 특징(stateless)을 가지고 있습니다.
+
+따라서 `비동기식 통신`으로 MQTT 프로토콜을 구현한 메시지 브로커(mosquitto)를 통하여 라즈베리파이의 센서로부터 전송된 데이터를 전송하였고, 비동기 통신이기 때문에 브로커에 메시지를 전달하기만 하고, 별도의 응답을 위한 대기 시간이 필요하지 않습니다. (`pub/sub 구조`)
+
+(MQTT는 경량이며, 저전력 단일 보드 컴퓨터에서 서버에 이르기까지 모든 장치에 사용하기 적합하며, pub/sub구조의 모델을 사용하여 가볍게 메시지를 전달하기 때문에 저전력 센서나 모바일 기기(폰, 임베디드 컴퓨터나 마이크로 컨트롤러)와 같은 IoT기기로부터 메시지를 전달하기 적합합니다)
+
+<br/>
+
+### **(2) AWS IoT Core → AWS IoT Rule → Amazon Kinesis Data Streams**
+
+라즈베리파이의 SenseHAT 모듈로부터 생성된 센서 데이터는 지정 Topic으로 전송을 하도록 코드를 작성하였습니다.
 AWS의 서비스간에는 서로 통신을 하기 위해서 IoT rule을 연결해주는 작업을 할때 Kinesis data stream과 통신하기 위한 IAM Role을 적용시켰습니다. (`적용시에 직면했던 Issue에 대해서 아래에 별도로 작성을 하였습니다`)
 
 If you decide to include this, you should also talk a bit about why you chose the architecture and tools you did for this project.
@@ -42,9 +56,13 @@ Replace the example step-by-step instructions with your own.
 
 ## Lessons Learned
 
+### Mosquitto와 RabbitMQ
+
+이번 프로젝트에서는 mosquitto 메시지 브로커를 사용하여 IoT 기기로부터의 센서 데이터를 Kinesis data stream으로 전달하도록 구성하였습니다.
+
 It's good to reflect on what you learned throughout the process of building this project. Here you might discuss what you would have done differently if you had more time/money/data. Did you end up choosing the right tools or would you try something else next time?
 
-## Issues
+## **Issues**
 
 데이터 파이프라인을 구축할때 직면했던 문제에 대해서 정리를 하려고 합니다. 
 
