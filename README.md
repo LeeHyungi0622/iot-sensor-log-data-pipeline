@@ -79,6 +79,15 @@ AWS와 같은 클라우드 서비스를 사용하는 이유는 관리적 요소�
 
 현재 구성한 데이터 파이프라인에서는 위와같은 한계점에 대해서 고려하지 않아도 문제가 되지 않지만, 향후 직접 대용량의 데이터를 넘겨서 처리해야되는 경우에는 위와같은 요소들을 고려해야 합니다.
 
+<br/>
+
+### **(3) Amazon Kinesis Data Streams → Amazon Kinesis Data Firehose → S3 → Lambda → DynamoDB → Amazon Athena → S3**
+
+Amazon Kinesis Data Streams으로 들어온 데이터가 Firehose를 통해서 S3의 지정 bucket에 적재가 되면 Amazon Lambda가 트리거 되어, 작성된 파이썬 스크립트를 통해 아래의 로직이 실행이 됩니다.
+
+![Example architecture image](assets/220713_flow_chart_iot_sensor_project.png)
+
+
 ### **Data Visualization**
 
 ![Example dashboard image](example-dashboard.png)
