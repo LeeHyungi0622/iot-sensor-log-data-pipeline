@@ -8,6 +8,7 @@ import logging
 import os
 #log 찍을때 stderror
 import sys
+import time
 
 # DynamoDB Client 생성하기
 dynamodb_client = boto3.client('dynamodb')
@@ -103,10 +104,11 @@ def run_ctas(athena_client, now_timestamp):
     return new_table_name
 
 # 압축시에 생성되는 tmp 파일 삭제하는 메소드
-def drop_tmp_table(athena_client):
+def drop_tmp_table(athena_client, now_timestamp):
     output_location = 's3://{bucket_name}/tmp'.format(bucket_name=BUCKET_NAME)
+    table_name = '{table}_{year}{month:02}{day:02}{hour:02}{minute:02}'.format(table=NEW_TABLE_NAME,year=now_timestamp.year,month=now_timestamp.month,day=now_timestamp.day,hour=now_timestamp.hour,minute=now_timestamp.minute)
     # Athena에 생성된 tmp table 삭제
-    query = 'DROP TABLE IF EXISTS {database}.tmp_{table}_*'.format(database=NEW_DATABASE, table=NEW_TABLE_NAME)
+    query = 'DROP TABLE IF EXISTS {database}.tmp_{table_name}'.format(database=NEW_DATABASE,table_name=table_name)
 
     print('[LOG] QueryString:\n{}'.format(query), file=sys.stderr)
     print('[LOG] OutputLocation: {}'.format(output_location), file=sys.stderr)
@@ -161,11 +163,11 @@ def lambda_handler(event, context):
     if check_count_num():
         # 테이블을 압축하고, 자동생성되는 tmp 파일을 제거
         run_ctas(client, now_timestamp)
-        # drop_tmp_table(client)
         # 로그 데이터가 쌓인 디렉토리를 비우기
         empty_s3_log_folder()
         # DynamoDB의 TotalCount값을 0으로 초기화
         initialize_dynamo_db_tbl()
+        drop_tmp_table(client, now_timestamp)
 
     # 아직 DynamoDB에 count된 값이 5보다 작은 경우,
     else:
