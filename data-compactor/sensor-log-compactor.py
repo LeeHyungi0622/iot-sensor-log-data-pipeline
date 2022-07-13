@@ -65,7 +65,7 @@ def check_count_num():
         )
         total_count = itemdata['Item']['TotalCount']
         print('type:', type(total_count), 'value:', total_count)
-        return total_count > 5
+        return total_count >= 100
     except Exception as e:
         logging.error("type : %s", type(e))
         logging.error(e)
@@ -159,7 +159,7 @@ def lambda_handler(event, context):
     client = boto3.client('athena')
     now_timestamp = datetime.now()
     # print(table.scan())
-    # 만약에 DynamoDB에 count된 값이 5보다 큰 경우,
+    # 만약에 DynamoDB에 count된 값이 100보다 큰 경우,
     if check_count_num():
         # 테이블을 압축하고, 자동생성되는 tmp 파일을 제거
         run_ctas(client, now_timestamp)
@@ -168,7 +168,6 @@ def lambda_handler(event, context):
         # DynamoDB의 TotalCount값을 0으로 초기화
         initialize_dynamo_db_tbl()
         drop_tmp_table(client, now_timestamp)
-
-    # 아직 DynamoDB에 count된 값이 5보다 작은 경우,
+    # 아직 DynamoDB에 count된 값이 100보다 작은 경우,
     else:
         increase_counter()
