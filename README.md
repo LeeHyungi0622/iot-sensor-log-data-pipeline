@@ -9,6 +9,23 @@
 
 이렇게 S3에 적재된 데이터는 AWS의 QuickSight(BI툴)서비스를 통해 시각화하여 처리할 수 있도록 구성하였고, 시간 단위로 Source 데이터를 업데이트가 되도록 구성하였습니다.
 
+<br/>
+
+## **Dataset**
+
+프로젝트에서 사용할 데이터는 라즈베리 파이(+SenseHAT)로부터 측정된 온/습도 센서 데이터를 활용했습니다. 실시간으로 생성되는 데이터를 S3와 Opensearch에 각 각 흘려서 처리하는 데이터 파이프라인을 구성해보기 위해 해당 데이터셋을 선정하였습니다.
+
+<br/>
+
+## **Objective**
+
+이번 프로젝트를 통해 주어진 데이터셋을 분석하여 아래의 내용들과의 상관관계에 대해서 알아볼 것입니다.
+
+- 시간대별 평균 온도/습도
+- 시간 변화에 따른 온도/습도의 변화 
+
+<br/>
+
 ## **Data Architecture**
 
 ![Example architecture image](assets/220707_iot_project_aws_network_topology.png)
@@ -87,10 +104,76 @@ Amazon Kinesis Data Streams으로 들어온 데이터가 Firehose를 통해서 S
 
 ![Example architecture image](assets/220713_flow_chart_iot_sensor_project.png)
 
+<br/>
 
-### **Data Visualization**
+### **(4) Amazon Kinesis Data Streams → Amazon Kinesis Data Firehose → Opensearch(Elasticsearch) service → Kibana → EC2**
 
-![Example dashboard image](example-dashboard.png)
+Amazon Kinesis Data Streams으로부터 들어온 데이터가 Firehose를 통해서 Opensearch(Elasticsearch)서비스로 데이터를 인덱싱합니다. Firehose에서 Destination으로 Opensearch를 지정할때, Index와 Index rotation을 지정하게 되는데, Index는 sensor-log, Index rotation은 Every hour로 설정하여, 시간대별로 인덱스를 나눠서 데이터를 인덱싱할 수 있도록 하였습니다.
+
+그리고 Opensearch service를 생성할때 별도의 VPC와 Subnet을 지정하여 생성하였기 때문에 Firehose destination의 VPC connection에 대한 설정도 별도로 Subnet과 AZ를 지정(`172.31.0.0/20, ap-northeast-2a`)하였습니다.
+단, 별도의 Subnet과 AZ(가용영역)에 대해 설정을 하여 Opensearch service를 생성하였기 때문에 로컬 환경의 브라우저 상에서 Kibana Endpoint URL을 통해 접근을 할 수 없습니다.(`다른 도메인`) 따라서 같은 도메인을 갖는 EC2 인스턴스(Windows server 2016)를 생성하여 Opensearch service와 연동된 Kibana에 접근하고, Opensearch service에 적재된 데이터를 활용하여 시각화를 해보았습니다.   
+
+<br/>
+
+## **Data Transformation & Visualization**
+
+온/습도 측정은 2022년 07월 14일 00시부터 14시까지 측정하였습니다. 온도의 경우에는 측정하는데 사용된 라즈베리 파이 기판의 표면 온도에 따라 다소 높게 측정될 수도 있다는 점을 고려하여 해석하였으며, 00시(`UTC+0 기준 15시`)에는 실내에 잠시 라즈베리파이를 비치하였기 때문에 실제 온도 변화추이는 01시(`UTC+0 기준 16시`)를 시작으로 해석하였습니다. 
+
+아래에 자세하게 온/습도 변화의 추이에 대해서 분석한 내용을 작성하였지만, 온/습도가 모두 00~02시(`증감`), 02~06시(`유지`), 06~10시(`증감`), 10~14시(`유지`)의 패턴으로 같은 변화추이를 보이고 있습니다. 
+또한 온도가 증가하면, 습도는 상대적으로 낮아지고, 온도가 감소하면, 습도가 상대적으로 높아지는 것을 확인할 수 있었습니다. 
+
+<table>
+    <tr>
+        <th style="text-align:center">NO</th>
+        <th style="text-align:center">Image</th>
+        <th style="text-align:center">Description</th>
+    </tr>
+    <tr>
+        <td>1</td>
+        <td>
+            <img src="assets/220715_average_temperature_bar.png" alt="시간대별 평균 온도" />
+        </td>
+        <td>
+            <b>[시간대별 평균 온도]</b><br/>
+            <small>시간대별 평균 온도의 변화추이는 00시부터 02시 사이에 온도가 점차 줄어들다가 02시부터 06시까지 28~29도를 유지하고 있습니다. 이후에 06시부터 10시까지 온도가 다시 증가하는 것을 확인할 수 있으며, 10시부터 14시까지는 35~36도 사이로 온도가 유지되는 것을 확인할 수 있었습니다.</small>     
+        </td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td>
+            <img src="assets/220715_average_humidity_bar.png" alt="시간대별 평균 습도" />
+        </td>
+        <td>
+        <b>[시간대별 평균 습도]</b>
+        <br/>
+        <small>시간대별 평균 습도는 00시부터 02시 사이에 습도가 점차 증가를 하다가 02시부터 06시까지 69~73 수치를 유지하고 있습니다. 이후에 06시부터 10시까지 습도가 점차 감소하다가 10~14시에는 49~53도 사이로 습도가 유지되는 것을 확인할 수 있었습니다.</small>
+        </td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td>
+            <img src="assets/220715_max_temperature.png" alt="시간 변화에 따른 온도의 변화" />
+        </td>
+        <td>
+            <b>[시간 변화에 따른 온도의 변화]</b>
+            <br/>
+            <small>앞서 시간대별 온도의 변화추이를 살펴보았듯이 온도가 새벽시간대에 낮아지다가 유지가 되고, 아침이 되면 다시 올라가다가 오후시간대에 다시 유지가 되는 변화추이를 관찰할 수 있습니다.</small>
+        </td>
+    </tr>
+    <tr>
+        <td>4</td>
+        <td>
+            <img src="assets/220715_max_humidity.png" alt="시간 변화에 따른 습도의 변화" />
+        </td>
+        <td>
+        <b>[시간 변화에 따른 습도의 변화]</b>
+            <br/>
+            <small>앞서 시간대별 습도의 변화추이를 살펴보았듯이 습도가 새벽시간대에 높아지다가 유지가되고, 아침에 온도가 올라감과 동시에 습도가 내려가다가 오후시간대에 습도가 유지되는 변화추이를 관찰할 수 있었습니다.</small>
+        </td>
+    </tr>
+</table>
+
+<br/>
 
 ## Prerequisites
 
