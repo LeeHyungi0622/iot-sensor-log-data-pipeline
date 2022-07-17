@@ -179,9 +179,20 @@ Amazon Kinesis Data Streams으로부터 들어온 데이터가 Firehose를 통�
 
 Directions or anything needed before running the project.
 
-- Prerequisite 1
-- Prerequisite 2
-- Prerequisite 3
+- AWS 계정을 준비
+- 코드를 실행할 IDE (VSCODE, Sublime Text 등) 준비
+- 라즈베리파이에 운영체제를 설치하기 위해 micro SD 카드 준비 및 운영체제 설치
+- 라즈베리파이와 AWS IoT Core를 연동 
+    - 디바이스 SDK 설치
+        - cmake, libssl-dev, git, python3(over v3.6), pip3 설치
+        ```zsh
+        $ sudo apt install cmake libssl-dev git python3-pip
+        ```
+    - Python 전용 AWS IoT Device SDK 설치
+        - 참고 
+    ```zsh
+
+    ```
 
 ## How to Run This Project
 
