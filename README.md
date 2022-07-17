@@ -175,6 +175,8 @@ Amazon Kinesis Data Streams으로부터 들어온 데이터가 Firehose를 통�
 
 <br/>
 
+<br/>
+
 ## Prerequisites
 
 Directions or anything needed before running the project.
@@ -182,26 +184,90 @@ Directions or anything needed before running the project.
 - AWS 계정을 준비
 - 코드를 실행할 IDE (VSCODE, Sublime Text 등) 준비
 - 라즈베리파이에 운영체제를 설치하기 위해 micro SD 카드 준비 및 운영체제 설치
-- 라즈베리파이와 AWS IoT Core를 연동 
-    - 디바이스 SDK 설치
-        - cmake, libssl-dev, git, python3(over v3.6), pip3 설치
-        ```zsh
-        $ sudo apt install cmake libssl-dev git python3-pip
-        ```
-    - Python 전용 AWS IoT Device SDK 설치
-        - 참고 
-    ```zsh
 
-    ```
+<br/>
 
 ## How to Run This Project
 
-Replace the example step-by-step instructions with your own.
+- 라즈베리파이와 AWS IoT Core를 연동 
+    - 디바이스 SDK 설치
+        - cmake, libssl-dev, git, python3(over v3.6), pip3 설치
+            ```zsh
+            $ sudo apt install cmake libssl-dev git python3-pip
+            ```
+        - Python 전용 AWS IoT Device SDK 설치
+            - 참고 : https://github.com/aws/aws-iot-device-sdk-python-v2
 
-1. Install x packages
-2. Run command: `python x`
-3. Make sure it's running properly by checking z
-4. To clean up at the end, run script: `python cleanup.py`
+            ```zsh
+            <!-- Install from PyPI -->
+            $ python3 -m pip install awsiotsdk
+
+            <!-- Install from source -->
+            <!-- Create a workspace directory to hold all the SDK files -->
+            mkdir sdk-workspace
+            cd sdk-workspace
+            
+            <!-- Clone the repository -->
+            git clone https://github.com/aws/aws-iot-device-sdk-python-v2.git
+            
+            <!-- Install using Pip -->
+            python3 -m pip install ./aws-iot-device-sdk-python-v2
+            ```
+    
+    <br/>
+
+    - 인증서 설치 
+
+        AWS IoT Core에서 디바이스를 등록하면, 인증서(`*.pem, *.pem.crt, *.pen.key`) 파일이 생성된다. 해당 파일을 라즈베리파이에 디렉토리를 만들어서 위치시킨다.
+            
+            - Root CA 인증서 : raspberrypi-sensor-device.cert.pem
+            - Device 인증서 : root-CA.crt
+            - Private 키 : raspberrypi-sensor-device.private.key
+    
+    <br/>
+
+    - Publish 파이썬 코드 작성
+
+        (프로젝트 내의 `data-publish` 디렉토리 내의 sensor_publish.py 코드 참고) 
+        AWS IoT Core에서 관리>사물을 확인해보면, `END POINT URL`, `디바이스 이름`을 확인할 수 있는데, 해당 정보를 publish 파이썬 코드에 업데이트를 해주고, 앞서 생성한 인증서의 위치 정보도 코드에 업데이트를 시켜준다.
+
+    <br/>
+
+    - Publish 파이썬 코드 실행 및 전송 데이터 
+
+        라즈베리파이에서 작성한 Publish 파이썬 코드를 실행해서 data를 publish하면, AWS IoT Core 서비스에서 `테스트 - MQTT 테스트 클라이언트`를 통해 흘러가는 데이터를 확인할 수 있다.
+
+    <br/>
+
+- IoT Core에서 브로커로부터 받은 데이터를 Kinesis data streams로 넘기기 
+    - Broker로부터 취득한 데이터를 Kinesis data stream으로 흘려보내주기 위해서 IoT Core에서 IoT Rule을 생성해준다. Rule 생성시에 흘려보낼 target component와 통신을 위한 역할을 설정해준다.
+
+<br/>
+
+- Kinesis data firehose 생성
+    
+    이번 프로젝트에서는 데이터를 Opensearch service와 S3 Bucket에 로그 데이터를 압축해서 저장할 것이기 때문에 2개의 firehose를 생성해준다.
+    <br/>
+
+    - OpenSearch service 
+        - 두 개의 Firehose 중에 하나의 destination을 Opensearch로 해주게 되면, 연결해줄 VPC, Subnet 등을 설정을 해줘야 된다. <br/> Opensearch 서비스를 생성할때에도 Opensearch 서비스 도메인을 VPC 내에 배치를 해줌으로써 인터넷 게이트웨이와 같은 별도의 연결없이도 OpenSearch 서비스와 VPC 내의 다른 서비스 간의 보안 통신이 가능하기 때문에 VPC를 설정하여 서비스를 생성해준다. 
+
+        <br/>
+
+        - OpenSearch 서비스에 적재된 데이터로 대시보드를 생성해서 시각화하기 위해서는 같은 도메인 상에 있는 EC2 인스턴스를 생성해준다. 프로젝트에서는 Windows server 2016을 생성해서 OpenSearch 대시보드 URL을 통해 접근한다.
+
+    <br/>
+
+    - S3 bucket
+        -  남은 하나의 Firehose의 Destination으로는 S3 bucket으로 설정을 해주는데, 설정한 target directory는 Lambda와 트리거 되어있기 때문에 데이터가 쌓이게 되면, DynamoDB의 테이블에서 쌓인 파일의 갯수를 카운트해주게 된다.<br/>쌓인 데이터 파일이 100개(설정값)이 되면, Athena를 통해 CTAS 쿼리를 실행해서 별도의 압축된 형태로 데이터를 S3 bucket에 저장을 하게 된다. 
+        
+        <br/>
+
+        - 우선 target으로 지정할 bucket을 생성을 해주고, target S3 bucket과 트리거 되어있는 Lambda함수를 생성해준다. 그리고 프로젝트의 `data-compactor/sensor-log-compactor.py`의 코드를 코드 탭의 editor에 넣어주고, `구성-환경 변수`에서 코드실행에서 필요한 환경 변수를 입력해준다. 
+
+        <br/>
+
+        - Athena에서 CTAS 쿼리를 실행해서 쌓인 데이터 파일들을 100개 단위로 압축해줄 것이기 때문에 Athena에서 데이터의 schema에 맞춰 테이블을 새로 생성해준다.
 
 ## Lessons Learned
 

@@ -2,12 +2,12 @@ import time
 import datetime
 import json
 from sense_hat import SenseHat
-from awscrt import io, mqtt, auth, http
+from awscrt import io, mqtt
 from awsiot import mqtt_connection_builder
 
 sense = SenseHat()
 
-topic = "test/testing"
+topic = "sensor/data"
 client_id = "raspberrypi"
 
 # Callback when connection is accidentally lost.
