@@ -64,7 +64,7 @@ def check_count_num():
         )
         total_count = itemdata['Item']['TotalCount']
         print('type:', type(total_count), 'value:', total_count)
-        return total_count > 5
+        return total_count > 99
     except Exception as e:
         logging.error("type : %s", type(e))
         logging.error(e)
